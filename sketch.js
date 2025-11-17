@@ -10,7 +10,7 @@ let detailPanel = {
   y: 0,
   width: 450,
   height: 550,
-  closeButton: {x: 0, y: 0, size: 25}
+  currentView: 'info' // 'info' o 'graph'
 };
 
 // Variabili per trascinare la card
@@ -36,7 +36,6 @@ let colors = {};
 
 function preload() {
   table = loadTable('data.csv', 'csv', 'header');
-  // Usa un GeoJSON della mappa mondiale (devi avere questo file)
   worldGeo = loadJSON('countries.geojson');
 }
 
@@ -53,7 +52,6 @@ function setup() {
   
   // Carica tutti i dati
   loadAllData();
-  
   console.log('Loaded countries:', allCountries.length);
   console.log('GeoJSON features:', worldGeo ? worldGeo.features.length : 0);
 }
@@ -81,11 +79,9 @@ function draw() {
 
 function loadAllData() {
   allCountries = [];
-  
   for (let i = 0; i < table.getRowCount(); i++) {
     try {
       let row = table.getRow(i);
-      
       let getSafeNum = (colName) => {
         let val = row.get(colName);
         if (val === '' || val === null || val === undefined) return 0;
@@ -118,27 +114,25 @@ function loadAllData() {
 // Disegno mondo
 function drawWorld() {
   if (!worldGeo || !worldGeo.features) return;
-
+  
   push();
   stroke(255, 255, 255, 80);
   strokeWeight(0.5);
-
+  
   for (let feature of worldGeo.features) {
     let countryName = feature.properties.ADMIN || feature.properties.name;
     let avgValue = getAverageForCountry(countryName);
-    
     fill(getColorForAverage(avgValue));
     
     let geom = feature.geometry;
     if (!geom) continue;
-
+    
     if (geom.type === 'Polygon') {
       drawPolygon(geom.coordinates);
     } else if (geom.type === 'MultiPolygon') {
       for (let poly of geom.coordinates) drawPolygon(poly);
     }
   }
-
   pop();
 }
 
@@ -158,7 +152,6 @@ function drawPolygon(coordArray) {
 
 function getAverageForCountry(geoCountryName) {
   if (!geoCountryName) return 0;
-  
   for (let country of allCountries) {
     if (country.country.toLowerCase() === geoCountryName.toLowerCase() ||
         geoCountryName.toLowerCase().includes(country.country.toLowerCase()) ||
@@ -170,19 +163,13 @@ function getAverageForCountry(geoCountryName) {
 }
 
 function getColorForAverage(average) {
-  if (average === 0) return color(80, 80, 80); // grigio per dati mancanti
-  
-  // Da bianco (basso) → rosa → viola scuro (alto)
+  if (average === 0) return color(80, 80, 80);
   let t = average / 100;
-  
   if (t < 0.33) {
-    // Bianco → Rosa chiaro
     return lerpColor(color(255, 255, 255), color(255, 200, 220), t * 3);
   } else if (t < 0.66) {
-    // Rosa chiaro → Rosa intenso
     return lerpColor(color(255, 200, 220), color(255, 100, 180), (t - 0.33) * 3);
   } else {
-    // Rosa intenso → Viola scuro
     return lerpColor(color(255, 100, 180), color(100, 30, 120), (t - 0.66) * 3);
   }
 }
@@ -190,7 +177,7 @@ function getColorForAverage(average) {
 // Hover
 function drawSimpleHover() {
   if (!worldGeo) return;
-
+  
   let mouseLon = map(mouseX, 0, width, -180, 180);
   let mouseLat = map(mouseY, 0, height, 85, -85);
   
@@ -216,7 +203,6 @@ function isMouseOverCountry(lon, lat, feature) {
       }
     }
   }
-  
   return false;
 }
 
@@ -229,7 +215,6 @@ function checkAllRings(lon, lat, polygonCoords) {
 
 function pointInPolygonSimple(x, y, polygon) {
   if (!polygon || polygon.length < 3) return false;
-  
   let inside = false;
   let j = polygon.length - 1;
   
@@ -250,10 +235,8 @@ function pointInPolygonSimple(x, y, polygon) {
         inside = !inside;
       }
     }
-    
     j = i;
   }
-  
   return inside;
 }
 
@@ -262,9 +245,9 @@ function showSimpleTooltip(countryName, x, y) {
   textStyle(BOLD);
   let w = textWidth(countryName);
   let h = 20;
-  
   let bx = x;
   let by = y;
+  
   if (bx + w + 16 > width) bx = x - (w + 16);
   if (by + h + 8 > height) by = height - (h + 8);
   if (bx < 6) bx = 6;
@@ -272,14 +255,11 @@ function showSimpleTooltip(countryName, x, y) {
   
   push();
   fill(0, 200);
-  stroke(255);
-  strokeWeight(1);
   rect(bx, by, w + 12, h + 4, 4);
-  
   fill(255);
   noStroke();
   textAlign(LEFT);
-  text(countryName, bx + 6, by + 14);
+  text(countryName, bx + 6, by + 16);
   pop();
 }
 
@@ -292,8 +272,6 @@ function drawLegend() {
   
   push();
   fill(0, 180);
-  stroke(255);
-  strokeWeight(1);
   rect(legendX, legendY, legendWidth, legendHeight, 5);
   
   fill(255);
@@ -301,9 +279,8 @@ function drawLegend() {
   textSize(14);
   textStyle(BOLD);
   text('Gender Equality Average', legendX + 15, legendY + 25);
-  
-  // Barra colori
   textStyle(NORMAL);
+  
   let colorBarY = legendY + 45;
   let colorBarHeight = 20;
   let colorBarWidth = legendWidth - 30;
@@ -323,28 +300,25 @@ function drawLegend() {
   textSize(10);
   fill(200);
   text('Click on a country to see details', legendX + 15, legendY + 110);
-  
   pop();
 }
 
 function drawTitle() {
-  let titleX = 280;
-  let titleY = height - 130;
+  let legendX = 0;
+  let legendY = height - 150;
+  let titleX = legendX + 15;
   
   push();
   fill(255);
   textAlign(LEFT, TOP);
-  textSize(32);
+  textSize(18);
   textStyle(BOLD);
-  text('Gender Equality Index Explorer', titleX, titleY);
+  text('Gender Equality Index Explorer', titleX, legendY - 50);
   
-  textSize(14);
+  textSize(12);
   textStyle(NORMAL);
   fill(200);
-  text('Interactive visualization of gender equality indicators across countries', titleX, titleY + 45);
-  text('• Hover to see country names', titleX, titleY + 68);
-  text('• Click to open detailed view with 11 indicators', titleX, titleY + 86);
-  
+  text('Interactive visualization of gender equality worldwide', titleX, legendY - 23);
   pop();
 }
 
@@ -353,52 +327,274 @@ function drawDetailPanel() {
   if (!selectedCountry || !selectedCountry.data) return;
   
   push();
-  
   // Sfondo
   fill(30, 30, 30, 240);
-  stroke(255, 255, 255, 150);
-  strokeWeight(2);
   rect(detailPanel.x, detailPanel.y, detailPanel.width, detailPanel.height, 8);
   
-  // Bottone chiudi
-  fill(200, 50, 50);
-  stroke(255);
-  strokeWeight(1);
-  rect(detailPanel.closeButton.x, detailPanel.closeButton.y, 
-       detailPanel.closeButton.size, detailPanel.closeButton.size, 3);
-  
+  // Nome paese in alto
+  noStroke();
   fill(255);
-  textAlign(CENTER, CENTER);
-  textSize(16);
-  textStyle(BOLD);
-  text('×', detailPanel.closeButton.x + detailPanel.closeButton.size/2, 
-            detailPanel.closeButton.y + detailPanel.closeButton.size/2);
-  
-  // Titolo paese
-  fill(255);
-  textAlign(LEFT);
+  textAlign(LEFT, TOP);
   textSize(20);
   textStyle(BOLD);
-  text(selectedCountry.name, detailPanel.x + 15, detailPanel.y + 25);
+  text(selectedCountry.name, detailPanel.x + 15, detailPanel.y + 15);
   
-  // Info base
+  // Toggle buttons in alto a destra
+  drawToggleButtons();
+  
+  // Contenuto in base alla vista
+  if (detailPanel.currentView === 'info') {
+    drawInfoView();
+  } else {
+    drawGraphView();
+  }
+  
+  // Bottone Chiudi in basso a destra
+  drawCloseButton();
+  pop();
+}
+
+function drawToggleButtons() {
+  let toggleWidth = 120;
+  let toggleHeight = 36;
+  let btnY = detailPanel.y + 10;
+  let toggleX = detailPanel.x + detailPanel.width - toggleWidth - 15;
+  
+  push();
+  // Sfondo grigio del toggle
+  fill(60, 60, 60);
+  noStroke();
+  rect(toggleX, btnY, toggleWidth, toggleHeight, toggleHeight/2);
+  
+  // Bottone scorrevole (knob) - LILLA e OVALE
+  let knobWidth = toggleWidth / 2 - 4;
+  let knobHeight = toggleHeight - 8;
+  let knobY = btnY + toggleHeight/2;
+  let knobX;
+  
+  if (detailPanel.currentView === 'info') {
+    knobX = toggleX + knobWidth/2 + 4;
+  } else {
+    knobX = toggleX + toggleWidth - knobWidth/2 - 4;
+  }
+  
+  // Bottone ovale lilla
+  fill(150, 100, 200);
+  noStroke();
+  rectMode(CENTER);
+  rect(knobX, knobY, knobWidth, knobHeight, knobHeight/2);
+  rectMode(CORNER);
+  
+  // Label "info" - bianca se selezionata, grigia se no
+  textAlign(CENTER, CENTER);
+  textSize(11);
+  textStyle(NORMAL);
+  if (detailPanel.currentView === 'info') {
+    fill(255);
+  } else {
+    fill(120, 120, 120);
+  }
+  text('info', toggleX + toggleWidth/4, knobY);
+  
+  // Label "graph" - bianca se selezionata, grigia se no
+  if (detailPanel.currentView === 'graph') {
+    fill(255);
+  } else {
+    fill(120, 120, 120);
+  }
+  text('graph', toggleX + 3*toggleWidth/4, knobY);
+  pop();
+}
+
+function drawCloseButton() {
+  let btnWidth = 80;
+  let btnHeight = 35;
+  let btnX = detailPanel.x + detailPanel.width - btnWidth - 15;
+  let btnY = detailPanel.y + detailPanel.height - btnHeight - 15;
+  
+  // Bottone con colore neutro e molto tondeggiante
+  fill(80, 80, 90);
+  rect(btnX, btnY, btnWidth, btnHeight, btnHeight/2);
+  
+  fill(220);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(13);
+  textStyle(NORMAL);
+  text('close', btnX + btnWidth/2, btnY + btnHeight/2);
+}
+
+function drawInfoView() {
   let data = selectedCountry.data;
+  let centerX = detailPanel.x + detailPanel.width/2;
+  let centerY = detailPanel.y + 250;
+  
+  push();
+  translate(centerX, centerY);
+  
+  let boundsData = getCountryBounds(selectedCountry.feature);
+  if (boundsData) {
+    let mainBounds = boundsData.mainBounds;
+    let lonRange = mainBounds.maxLon - mainBounds.minLon;
+    let latRange = mainBounds.maxLat - mainBounds.minLat;
+    
+    // Area massima disponibile
+    let maxWidth = 160;
+    let maxHeight = 160;
+    
+    // Scala basata sul territorio principale
+    let scaleX = maxWidth / lonRange;
+    let scaleY = maxHeight / latRange;
+    let scale = min(scaleX, scaleY);
+    
+    let offsetX = -(mainBounds.minLon + mainBounds.maxLon) / 2;
+    let offsetY = -(mainBounds.minLat + mainBounds.maxLat) / 2;
+    
+    fill(getColorForAverage(data.average));
+    stroke(255);
+    strokeWeight(1);
+    
+    // Disegna il territorio principale
+    drawScaledPolygon(boundsData.mainPolygon, offsetX, offsetY, scale);
+    
+    // Disegna le isole riposizionate
+    for (let island of boundsData.islands) {
+      let islandBounds = getPolygonBounds(island);
+      let islandCenterLon = (islandBounds.minLon + islandBounds.maxLon) / 2;
+      let islandCenterLat = (islandBounds.minLat + islandBounds.maxLat) / 2;
+      
+      // Calcola la posizione dell'isola rispetto al centro principale
+      let deltaLon = islandCenterLon - (mainBounds.minLon + mainBounds.maxLon) / 2;
+      let deltaLat = islandCenterLat - (mainBounds.minLat + mainBounds.maxLat) / 2;
+      
+      // Riduci la distanza dell'isola (avvicinala al centro)
+      let compressionFactor = 0.3; // Più basso = isole più vicine
+      let newDeltaLon = deltaLon * compressionFactor;
+      let newDeltaLat = deltaLat * compressionFactor;
+      
+      // Calcola il nuovo centro per l'isola
+      let newIslandCenterLon = (mainBounds.minLon + mainBounds.maxLon) / 2 + newDeltaLon;
+      let newIslandCenterLat = (mainBounds.minLat + mainBounds.maxLat) / 2 + newDeltaLat;
+      
+      // Offset per centrare l'isola nella nuova posizione
+      let islandOffsetX = -(islandBounds.minLon + islandBounds.maxLon) / 2 + newIslandCenterLon;
+      let islandOffsetY = -(islandBounds.minLat + islandBounds.maxLat) / 2 + newIslandCenterLat;
+      
+      // Disegna l'isola con trasparenza per distinguerla
+      fill(getColorForAverage(data.average));
+      drawScaledPolygon(island, islandOffsetX, islandOffsetY, scale);
+    }
+  }
+  pop();
+  
+  // Coordinate sotto
+  noStroke();
+  fill(200);
+  textAlign(CENTER, TOP);
+  textSize(14);
+  textStyle(NORMAL);
+  text('Latitude: ' + data.latitude.toFixed(2) + '°', centerX, centerY + 130);
+  text('Longitude: ' + data.longitude.toFixed(2) + '°', centerX, centerY + 155);
+}
+
+function drawGraphView() {
+  let data = selectedCountry.data;
+  
+  // Score sotto il nome
+  noStroke();
+  fill(200);
+  textAlign(LEFT, TOP);
   textSize(12);
   textStyle(NORMAL);
-  fill(200);
-  text('Average Score: ' + data.average.toFixed(1), detailPanel.x + 15, detailPanel.y + 50);
-  text('Coordinates: ' + data.latitude.toFixed(2) + '°, ' + data.longitude.toFixed(2) + '°', 
-       detailPanel.x + 15, detailPanel.y + 68);
+  text('Score: ' + data.average.toFixed(1), detailPanel.x + 15, detailPanel.y + 45);
   
   // Glifo a petali
   let glyphX = detailPanel.x + detailPanel.width/2;
   let glyphY = detailPanel.y + 220;
   drawDetailedGlyph(data, glyphX, glyphY);
   
-  // Tabella valori sotto il glifo
-  drawIndicatorsTable(data, detailPanel.x + 15, detailPanel.y + 360);
+  // Legenda sotto
+  drawIndicatorsLegend(detailPanel.x + 15, detailPanel.y + 360);
+}
+
+function getCountryBounds(feature) {
+  if (!feature || !feature.geometry) return null;
   
-  pop();
+  let geom = feature.geometry;
+  let coords = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+  
+  // Trova il poligono più grande (territorio principale)
+  let largestPolygon = null;
+  let maxArea = 0;
+  let largestIndex = 0;
+  
+  for (let i = 0; i < coords.length; i++) {
+    let area = calculatePolygonArea(coords[i][0]);
+    if (area > maxArea) {
+      maxArea = area;
+      largestPolygon = coords[i];
+      largestIndex = i;
+    }
+  }
+  
+  if (!largestPolygon) {
+    largestPolygon = coords[0];
+  }
+  
+  // Calcola bounds del territorio principale
+  let mainBounds = getPolygonBounds(largestPolygon);
+  
+  // Raccogli tutte le isole secondarie
+  let islands = [];
+  for (let i = 0; i < coords.length; i++) {
+    if (i !== largestIndex) {
+      islands.push(coords[i]);
+    }
+  }
+  
+  return {
+    mainBounds: mainBounds,
+    mainPolygon: largestPolygon,
+    islands: islands,
+    allPolygons: coords
+  };
+}
+
+function getPolygonBounds(polygon) {
+  let minLon = Infinity, maxLon = -Infinity;
+  let minLat = Infinity, maxLat = -Infinity;
+  
+  for (let ring of polygon) {
+    for (let point of ring) {
+      minLon = min(minLon, point[0]);
+      maxLon = max(maxLon, point[0]);
+      minLat = min(minLat, point[1]);
+      maxLat = max(maxLat, point[1]);
+    }
+  }
+  
+  return {minLon, maxLon, minLat, maxLat};
+}
+
+function calculatePolygonArea(ring) {
+  if (!ring || ring.length < 3) return 0;
+  let area = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    area += (ring[i][0] * ring[i + 1][1]) - (ring[i + 1][0] * ring[i][1]);
+  }
+  return Math.abs(area / 2);
+}
+
+function drawScaledPolygon(coordArray, offsetX, offsetY, scale) {
+  beginShape();
+  for (let ring of coordArray) {
+    for (let c of ring) {
+      let x = (c[0] + offsetX) * scale;
+      let y = -(c[1] + offsetY) * scale;
+      vertex(x, y);
+    }
+  }
+  endShape(CLOSE);
 }
 
 function drawDetailedGlyph(data, centerX, centerY) {
@@ -437,32 +633,26 @@ function drawDetailedGlyph(data, centerX, centerY) {
     fill(colors[indicator]);
     stroke(255);
     strokeWeight(2);
-    
     beginShape();
     vertex(0, 0);
     let x1 = cos(angle - angleStep / 4) * petalLength * 0.7;
     let y1 = sin(angle - angleStep / 4) * petalLength * 0.7;
     vertex(x1, y1);
-    
     let x2 = cos(angle) * petalLength;
     let y2 = sin(angle) * petalLength;
     vertex(x2, y2);
-    
     let x3 = cos(angle + angleStep / 4) * petalLength * 0.7;
     let y3 = sin(angle + angleStep / 4) * petalLength * 0.7;
     vertex(x3, y3);
-    
     endShape(CLOSE);
     
     // Valore sul petalo
     let labelDist = petalLength + 15;
     let labelX = cos(angle) * labelDist;
     let labelY = sin(angle) * labelDist;
-    
     fill(colors[indicator]);
     noStroke();
     ellipse(labelX, labelY, 18, 18);
-    
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(9);
@@ -475,14 +665,12 @@ function drawDetailedGlyph(data, centerX, centerY) {
   stroke(30);
   strokeWeight(3);
   ellipse(0, 0, 40, 40);
-  
   fill(30);
   noStroke();
   textAlign(CENTER, CENTER);
   textSize(14);
   textStyle(BOLD);
   text(data.average.toFixed(1), 0, -3);
-  
   textSize(8);
   textStyle(NORMAL);
   text('AVG', 0, 10);
@@ -490,15 +678,13 @@ function drawDetailedGlyph(data, centerX, centerY) {
   pop();
 }
 
-function drawIndicatorsTable(data, x, y) {
+function drawIndicatorsLegend(x, y) {
   textAlign(LEFT, TOP);
   textSize(10);
   textStyle(NORMAL);
-  fill(200);
   
   let col1 = [];
   let col2 = [];
-  
   for (let i = 0; i < indicators.length; i++) {
     if (i < 6) {
       col1.push(indicators[i]);
@@ -512,7 +698,7 @@ function drawIndicatorsTable(data, x, y) {
     fill(colors[col1[i]]);
     noStroke();
     rect(x, y + i * 16, 8, 8, 2);
-    
+    noStroke();
     fill(200);
     text(col1[i], x + 12, y + i * 16);
   }
@@ -523,24 +709,43 @@ function drawIndicatorsTable(data, x, y) {
     fill(colors[col2[i]]);
     noStroke();
     rect(col2X, y + i * 16, 8, 8, 2);
-    
+    noStroke();
     fill(200);
     text(col2[i], col2X + 12, y + i * 16);
   }
 }
 
+// --------------------
 // Interazioni
+// --------------------
 function mousePressed() {
   if (detailPanel.open) {
-    // Chiudi pannello
-    if (mouseX >= detailPanel.closeButton.x && mouseX <= detailPanel.closeButton.x + detailPanel.closeButton.size &&
-        mouseY >= detailPanel.closeButton.y && mouseY <= detailPanel.closeButton.y + detailPanel.closeButton.size) {
+    // Click sul bottone Chiudi
+    let btnWidth = 80;
+    let btnHeight = 35;
+    let btnX = detailPanel.x + detailPanel.width - btnWidth - 15;
+    let btnY = detailPanel.y + detailPanel.height - btnHeight - 15;
+    
+    if (mouseX >= btnX && mouseX <= btnX + btnWidth &&
+        mouseY >= btnY && mouseY <= btnY + btnHeight) {
       detailPanel.open = false;
       selectedCountry = null;
       return;
     }
     
-    // Inizia drag
+    // Click sul toggle
+    let toggleWidth = 120;
+    let toggleHeight = 36;
+    let btnYPos = detailPanel.y + 10;
+    let toggleX = detailPanel.x + detailPanel.width - toggleWidth - 15;
+    
+    if (mouseX >= toggleX && mouseX <= toggleX + toggleWidth &&
+        mouseY >= btnYPos && mouseY <= btnYPos + toggleHeight) {
+      detailPanel.currentView = detailPanel.currentView === 'info' ? 'graph' : 'info';
+      return;
+    }
+    
+    // Drag del pannello
     if (mouseX >= detailPanel.x && mouseX <= detailPanel.x + detailPanel.width &&
         mouseY >= detailPanel.y && mouseY <= detailPanel.y + detailPanel.height) {
       isDragging = true;
@@ -550,7 +755,6 @@ function mousePressed() {
     }
   }
   
-  // Apri pannello paese
   openCountryPanel();
 }
 
@@ -571,9 +775,8 @@ function openCountryPanel() {
   if (!foundCountry) return;
   
   let geoName = foundCountry.properties.ADMIN || foundCountry.properties.name;
-  
-  // Cerca nei dati
   let countryData = null;
+  
   for (let country of allCountries) {
     if (country.country.toLowerCase() === geoName.toLowerCase() ||
         geoName.toLowerCase().includes(country.country.toLowerCase()) ||
@@ -593,10 +796,8 @@ function openCountryPanel() {
     if (!detailPanel.open) {
       detailPanel.x = width - detailPanel.width - 20;
       detailPanel.y = 20;
+      detailPanel.currentView = 'info';
     }
-    
-    detailPanel.closeButton.x = detailPanel.x + detailPanel.width - 30;
-    detailPanel.closeButton.y = detailPanel.y + 5;
     detailPanel.open = true;
   }
 }
@@ -605,12 +806,8 @@ function mouseDragged() {
   if (isDragging && detailPanel.open) {
     detailPanel.x = mouseX - dragOffsetX;
     detailPanel.y = mouseY - dragOffsetY;
-    
     detailPanel.x = constrain(detailPanel.x, 0, width - detailPanel.width);
     detailPanel.y = constrain(detailPanel.y, 0, height - detailPanel.height);
-    
-    detailPanel.closeButton.x = detailPanel.x + detailPanel.width - 30;
-    detailPanel.closeButton.y = detailPanel.y + 5;
   }
 }
 
