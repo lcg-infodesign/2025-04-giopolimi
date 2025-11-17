@@ -722,9 +722,7 @@ function drawIndicatorsLegend(x, y) {
   }
 }
 
-// --------------------
-// Interazioni
-// --------------------
+// INTERAZIONI
 function mousePressed() {
   if (detailPanel.open) {
     // Click sul bottone Chiudi
