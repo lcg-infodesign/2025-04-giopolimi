@@ -41,6 +41,8 @@ function preload() {
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+
+  textFont('Space Grotesk');
   
   // Assegna colori agli indicatori
   colorMode(HSB);
@@ -294,8 +296,8 @@ function drawLegend() {
   
   textSize(11);
   fill(255);
-  text('Low (0)', legendX + 15, colorBarY + colorBarHeight + 15);
-  text('High (100)', legendX + legendWidth - 60, colorBarY + colorBarHeight + 15);
+  text('Low (0)', legendX + 15, colorBarY + colorBarHeight + 17);
+  text('High (100)', legendX + legendWidth - 60, colorBarY + colorBarHeight + 17);
   
   textSize(10);
   fill(200);
@@ -427,62 +429,67 @@ function drawCloseButton() {
 function drawInfoView() {
   let data = selectedCountry.data;
   let centerX = detailPanel.x + detailPanel.width/2;
-  let centerY = detailPanel.y + 250;
+  let centerY = detailPanel.y + 220;
   
   push();
   translate(centerX, centerY);
   
   let boundsData = getCountryBounds(selectedCountry.feature);
   if (boundsData) {
-    let mainBounds = boundsData.mainBounds;
-    let lonRange = mainBounds.maxLon - mainBounds.minLon;
-    let latRange = mainBounds.maxLat - mainBounds.minLat;
+    // Calcola i bounds di TUTTI i poligoni insieme (principale + isole)
+    let globalBounds = {
+      minLon: Infinity,
+      maxLon: -Infinity,
+      minLat: Infinity,
+      maxLat: -Infinity
+    };
     
-    // Area massima disponibile
-    let maxWidth = 160;
-    let maxHeight = 160;
+    // Trova i bounds globali includendo tutte le isole
+    for (let polygon of boundsData.allPolygons) {
+      let polyBounds = getPolygonBounds(polygon);
+      globalBounds.minLon = min(globalBounds.minLon, polyBounds.minLon);
+      globalBounds.maxLon = max(globalBounds.maxLon, polyBounds.maxLon);
+      globalBounds.minLat = min(globalBounds.minLat, polyBounds.minLat);
+      globalBounds.maxLat = max(globalBounds.maxLat, polyBounds.maxLat);
+    }
     
-    // Scala basata sul territorio principale
+    let lonRange = globalBounds.maxLon - globalBounds.minLon;
+    let latRange = globalBounds.maxLat - globalBounds.minLat;
+    
+    // Determina se il paese ha isole significative
+    let hasIslands = boundsData.islands.length > 0;
+    
+    // GESTIONE SEPARATA PER PAESI CON E SENZA ISOLE
+    let maxWidth, maxHeight, strokeW;
+    
+    if (hasIslands) {
+      // Paesi con isole - visualizzazione più ampia
+      maxWidth = 270;
+      maxHeight = 270;
+      strokeW = 0.5;
+    } else {
+      // Paesi senza isole - visualizzazione più grande e dettagliata
+      maxWidth = 180;
+      maxHeight = 180;
+      strokeW = 1;
+    }
+    
+    // Scala basata su TUTTI i territori
     let scaleX = maxWidth / lonRange;
     let scaleY = maxHeight / latRange;
     let scale = min(scaleX, scaleY);
     
-    let offsetX = -(mainBounds.minLon + mainBounds.maxLon) / 2;
-    let offsetY = -(mainBounds.minLat + mainBounds.maxLat) / 2;
+    // Offset per centrare tutto
+    let offsetX = -(globalBounds.minLon + globalBounds.maxLon) / 2;
+    let offsetY = -(globalBounds.minLat + globalBounds.maxLat) / 2;
     
     fill(getColorForAverage(data.average));
     stroke(255);
-    strokeWeight(1);
+    strokeWeight(strokeW);
     
-    // Disegna il territorio principale
-    drawScaledPolygon(boundsData.mainPolygon, offsetX, offsetY, scale);
-    
-    // Disegna le isole riposizionate
-    for (let island of boundsData.islands) {
-      let islandBounds = getPolygonBounds(island);
-      let islandCenterLon = (islandBounds.minLon + islandBounds.maxLon) / 2;
-      let islandCenterLat = (islandBounds.minLat + islandBounds.maxLat) / 2;
-      
-      // Calcola la posizione dell'isola rispetto al centro principale
-      let deltaLon = islandCenterLon - (mainBounds.minLon + mainBounds.maxLon) / 2;
-      let deltaLat = islandCenterLat - (mainBounds.minLat + mainBounds.maxLat) / 2;
-      
-      // Riduci la distanza dell'isola (avvicinala al centro)
-      let compressionFactor = 0.3; // Più basso = isole più vicine
-      let newDeltaLon = deltaLon * compressionFactor;
-      let newDeltaLat = deltaLat * compressionFactor;
-      
-      // Calcola il nuovo centro per l'isola
-      let newIslandCenterLon = (mainBounds.minLon + mainBounds.maxLon) / 2 + newDeltaLon;
-      let newIslandCenterLat = (mainBounds.minLat + mainBounds.maxLat) / 2 + newDeltaLat;
-      
-      // Offset per centrare l'isola nella nuova posizione
-      let islandOffsetX = -(islandBounds.minLon + islandBounds.maxLon) / 2 + newIslandCenterLon;
-      let islandOffsetY = -(islandBounds.minLat + islandBounds.maxLat) / 2 + newIslandCenterLat;
-      
-      // Disegna l'isola con trasparenza per distinguerla
-      fill(getColorForAverage(data.average));
-      drawScaledPolygon(island, islandOffsetX, islandOffsetY, scale);
+    // Disegna TUTTI i poligoni (principale + isole) con la stessa scala
+    for (let polygon of boundsData.allPolygons) {
+      drawScaledPolygon(polygon, offsetX, offsetY, scale);
     }
   }
   pop();
@@ -493,8 +500,8 @@ function drawInfoView() {
   textAlign(CENTER, TOP);
   textSize(14);
   textStyle(NORMAL);
-  text('Latitude: ' + data.latitude.toFixed(2) + '°', centerX, centerY + 130);
-  text('Longitude: ' + data.longitude.toFixed(2) + '°', centerX, centerY + 155);
+  text('Latitude: ' + data.latitude.toFixed(2) + '°', centerX, centerY + 180);
+  text('Longitude: ' + data.longitude.toFixed(2) + '°', centerX, centerY + 205);
 }
 
 function drawGraphView() {
